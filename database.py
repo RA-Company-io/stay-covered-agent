@@ -9,6 +9,10 @@ from typing import Optional
 
 DB_PATH = os.getenv("DB_PATH", "staycovered.db")
 
+# Cria o diretório se não existir
+import pathlib
+pathlib.Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
