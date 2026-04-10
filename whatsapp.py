@@ -12,11 +12,8 @@ ZAPI_BASE     = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOK
 
 
 def _numero_limpo(numero: str) -> str:
-    """Remove caracteres não numéricos e garante DDI."""
-    n = "".join(c for c in numero if c.isdigit())
-    if not n.startswith("55") and len(n) <= 11:
-        n = "55" + n
-    return n
+    """Remove caracteres não numéricos — Z-API aceita o número como veio do webhook."""
+    return "".join(c for c in numero if c.isdigit())
 
 
 async def enviar_mensagem(numero: str, texto: str) -> bool:
