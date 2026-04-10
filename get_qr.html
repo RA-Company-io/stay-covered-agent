@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>QR Code - Stay Covered</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #f0f0f0; margin: 0; }
+    h2 { color: #333; }
+    #box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin: 20px; text-align: center; min-width: 320px; }
+    #box img { width: 300px; height: 300px; display: block; margin: 0 auto; }
+    button { background: #0ea5e9; color: white; border: none; padding: 12px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+    button:hover { background: #0284c7; }
+    #log { margin-top: 12px; color: #666; font-size: 13px; }
+    pre { background:#f5f5f5; padding:10px; border-radius:6px; font-size:11px; text-align:left; max-width:400px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <h2>Stay Covered — Conectar WhatsApp</h2>
+  <div id="box">
+    <p>Clique no botão abaixo</p>
+  </div>
+  <button onclick="start()">Gerar QR Code</button>
+  <div id="log"></div>
+
+  <script>
+    const BASE = 'http://188.166.165.65:8080';
+    const KEY  = 'staycovered2024';
+    const INST = 'staycovered';
+    const headers = { 'apikey': KEY, 'Content-Type': 'application/json' };
+
+    function log(msg) {
+      document.getElementById('log').innerHTML += `<p>${msg}</p>`;
+    }
+
+    async function start() {
+      document.getElementById('box').innerHTML = '<p>Aguarde...</p>';
+      document.getElementById('log').innerHTML = '';
+
+      // Step 1: delete old instance if exists
+      log('🔄 Deletando instância antiga...');
+      try {
+        await fetch(`${BASE}/instance/delete/${INST}`, { method: 'DELETE', headers });
+      } catch(e) {}
+
+      await sleep(2000);
+
+      // Step 2: create fresh instance
+      log('🆕 Criando instância...');
+      const createRes = await fetch(`${BASE}/instance/create`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          instanceName: INST,
+          integration: 'WHATSAPP-BAILEYS',
+          qrcode: true,
+          groupsIgnore: true
+        })
+      });
+      const createData = await createRes.json();
+      log(`Criação: <pre>${JSON.stringify(createData, null, 2)}</pre>`);
+
+      // Step 3: fetch QR code with retries
+      let qrData = null;
+      for (let i = 1; i <= 8; i++) {
+        await sleep(3000);
+        log(`📱 Tentativa ${i}/8 de buscar QR Code...`);
+        const qrRes = await fetch(`${BASE}/instance/connect/${INST}`, { headers });
+        qrData = await qrRes.json();
+        if (qrData.base64 || qrData.code) break;
+        log(`⏳ Ainda gerando... aguardando.`);
+      }
+
+      if (qrData && qrData.base64) {
+        document.getElementById('box').innerHTML = `<img src="${qrData.base64}" /><p style="color:green;margin-top:10px">✅ Escaneie com o WhatsApp!</p>`;
+      } else if (qrData && qrData.code) {
+        document.getElementById('box').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData.code)}" /><p style="color:green;margin-top:10px">✅ Escaneie com o WhatsApp!</p>`;
+      } else {
+        document.getElementById('box').innerHTML = `<pre>${JSON.stringify(qrData, null, 2)}</pre>`;
+      }
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  </script>
+</body>
+</html>

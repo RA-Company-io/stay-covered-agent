@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.nome or lead.numero_wpp }} — Stay Covered CRM{% endblock %}
+{% block content %}
+
+<div class="flex h-screen overflow-hidden">
+
+  <!-- ── Left panel: chat ──────────────────────────────────────────── -->
+  <div class="flex flex-col flex-1 min-w-0 bg-gray-50">
+
+    <!-- Chat header -->
+    <div class="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <a href="/" class="text-gray-400 hover:text-brand transition-colors text-lg">←</a>
+        <div class="w-9 h-9 rounded-full bg-brand-light flex items-center justify-center text-brand font-bold text-sm">
+          {{ (lead.nome or lead.numero_wpp)[:1].upper() }}
+        </div>
+        <div>
+          <div class="font-semibold text-gray-900 text-sm">{{ lead.nome or lead.numero_wpp }}</div>
+          <div class="text-xs text-gray-400">{{ lead.numero_wpp }}</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="status-badge" class="px-2.5 py-1 rounded-full text-xs font-medium {{ lead.status_class }}">
+          {{ lead.status }}
+        </span>
+        {% if lead.bot_ativo %}
+        <button onclick="toggleBot(false)"
+          class="px-3 py-1.5 text-xs rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 font-medium transition-colors">
+          Assumir conversa
+        </button>
+        {% else %}
+        <span class="px-2.5 py-1 rounded-full text-xs bg-orange-100 text-orange-700 font-medium">Atendimento manual</span>
+        <button onclick="toggleBot(true)"
+          class="px-3 py-1.5 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 font-medium transition-colors">
+          Passar para Sofia
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+      {% for msg in messages %}
+      <div class="flex {% if msg.role == 'user' %}justify-start{% else %}justify-end{% endif %}">
+        <div class="max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm
+          {% if msg.role == 'user' %}
+            bg-white border border-gray-200 text-gray-800 rounded-tl-sm
+          {% else %}
+            bg-brand text-white rounded-tr-sm
+          {% endif %}">
+          {{ msg.content }}
+          <div class="text-xs mt-1 opacity-60 text-right">{{ msg.timestamp[11:16] }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Manual input (shown when bot is off) -->
+    <div id="manual-input" class="{% if lead.bot_ativo %}hidden{% endif %} bg-white border-t border-gray-200 px-4 py-3 flex gap-2 flex-shrink-0">
+      <input id="manual-text" type="text" placeholder="Digite sua mensagem..."
+        class="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+        onkeydown="if(event.key==='Enter') sendManual()" />
+      <button onclick="sendManual()"
+        class="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors">
+        Enviar
+      </button>
+    </div>
+
+    <!-- Bot active indicator -->
+    <div id="bot-indicator" class="{% if not lead.bot_ativo %}hidden{% endif %} bg-green-50 border-t border-green-100 px-4 py-2.5 text-xs text-green-700 text-center flex-shrink-0">
+      🤖 Sofia está respondendo automaticamente
+    </div>
+
+  </div>
+
+  <!-- ── Right panel: lead info ────────────────────────────────────── -->
+  <div class="w-72 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <div class="font-semibold text-gray-900 text-sm">Dados do Lead</div>
+    </div>
+
+    <div class="px-5 py-4 space-y-3 text-sm">
+      {% set fields = [
+        ('👤', 'Nome', lead.nome),
+        ('📧', 'E-mail', lead.email),
+        ('📱', 'Telefone', lead.telefone),
+        ('🎂', 'Nascimento', lead.data_nascimento),
+        ('🪪', "Driver's License", lead.driver_license),
+        ('💍', 'Estado civil', lead.estado_civil),
+        ('🏠', 'Endereço', lead.endereco),
+        ('🚗', 'VIN', lead.vin),
+        ('🏡', 'Imóvel', lead.imovel_tipo),
+      ] %}
+      {% for icon, label, value in fields %}
+      <div class="{% if not value %}opacity-40{% endif %}">
+        <div class="text-xs text-gray-400 mb-0.5">{{ icon }} {{ label }}</div>
+        <div class="text-gray-800 font-medium text-xs break-all">{{ value or '—' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Progress bar -->
+    <div class="px-5 py-4 border-t border-gray-100">
+      {% set filled = [lead.nome, lead.email, lead.telefone, lead.data_nascimento,
+                       lead.driver_license, lead.estado_civil, lead.endereco,
+                       lead.vin, lead.imovel_tipo] | select | list | length %}
+      <div class="flex justify-between text-xs text-gray-500 mb-1">
+        <span>Dados coletados</span>
+        <span>{{ filled }}/9</span>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-2">
+        <div class="bg-brand h-2 rounded-full transition-all" style="width: {{ (filled / 9 * 100) | int }}%"></div>
+      </div>
+    </div>
+
+    <!-- Status selector -->
+    <div class="px-5 py-4 border-t border-gray-100">
+      <div class="text-xs text-gray-400 mb-2">Alterar status</div>
+      <select onchange="updateStatus(this.value)"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand">
+        {% for s in all_statuses %}
+        <option value="{{ s }}" {% if s == lead.status %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const leadId = {{ lead.id }};
+  let lastMsgId = {{ last_msg_id }};
+
+  // Scroll to bottom on load
+  const msgContainer = document.getElementById('messages');
+  msgContainer.scrollTop = msgContainer.scrollHeight;
+
+  // Poll for new messages every 3 seconds
+  async function pollMessages() {
+    try {
+      const res = await fetch(`/api/lead/${leadId}/messages?since=${lastMsgId}`);
+      const data = await res.json();
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(msg => {
+          appendMessage(msg);
+          lastMsgId = msg.id;
+        });
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+      }
+    } catch(e) {}
+    setTimeout(pollMessages, 3000);
+  }
+
+  function appendMessage(msg) {
+    const div = document.createElement('div');
+    div.className = `flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`;
+    const bubble = msg.role === 'user'
+      ? `bg-white border border-gray-200 text-gray-800 rounded-tl-sm`
+      : `bg-brand text-white rounded-tr-sm`;
+    div.innerHTML = `
+      <div class="max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm ${bubble}">
+        ${msg.content}
+        <div class="text-xs mt-1 opacity-60 text-right">${msg.timestamp.substring(11,16)}</div>
+      </div>`;
+    msgContainer.appendChild(div);
+  }
+
+  async function sendManual() {
+    const input = document.getElementById('manual-text');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    await fetch(`/api/lead/${leadId}/send`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: text })
+    });
+  }
+
+  async function toggleBot(activate) {
+    await fetch(`/api/lead/${leadId}/bot`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ active: activate })
+    });
+    location.reload();
+  }
+
+  async function updateStatus(status) {
+    await fetch(`/api/lead/${leadId}/status`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ status })
+    });
+  }
+
+  pollMessages();
+</script>
+
+{% endblock %}

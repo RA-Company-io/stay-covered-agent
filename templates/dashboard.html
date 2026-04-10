@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Stay Covered CRM{% endblock %}
+{% block content %}
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+  <div>
+    <span class="text-xl font-bold text-brand">Stay Covered</span>
+    <span class="text-gray-400 text-sm ml-2">CRM</span>
+  </div>
+  <div class="flex items-center gap-4">
+    <span class="text-sm text-gray-500">{{ total_leads }} leads</span>
+    <a href="/logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors">Sair</a>
+  </div>
+</header>
+
+<!-- Stats bar -->
+<div class="bg-white border-b border-gray-100 px-6 py-3 flex gap-6 text-sm overflow-x-auto">
+  {% for s in stats %}
+  <div class="flex items-center gap-2 whitespace-nowrap">
+    <span class="w-2.5 h-2.5 rounded-full {{ s.color }}"></span>
+    <span class="text-gray-600">{{ s.label }}</span>
+    <span class="font-semibold text-gray-900">{{ s.count }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Lead list -->
+<main class="max-w-4xl mx-auto px-4 py-6">
+
+  {% if not leads %}
+  <div class="text-center text-gray-400 mt-20">
+    <div class="text-5xl mb-4">💬</div>
+    <div class="text-lg">Nenhum lead ainda.</div>
+    <div class="text-sm mt-1">Os leads aparecerão aqui quando começarem a conversar.</div>
+  </div>
+  {% endif %}
+
+  <div class="space-y-2">
+  {% for lead in leads %}
+  <a href="/lead/{{ lead.id }}"
+     class="block bg-white rounded-xl border border-gray-200 hover:border-brand hover:shadow-sm transition-all px-5 py-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Avatar -->
+        <div class="w-10 h-10 rounded-full bg-brand-light flex items-center justify-center flex-shrink-0 text-brand font-bold text-sm">
+          {{ (lead.nome or lead.numero_wpp)[:1].upper() }}
+        </div>
+        <div class="min-w-0">
+          <div class="font-medium text-gray-900 truncate">
+            {{ lead.nome or lead.numero_wpp }}
+          </div>
+          <div class="text-xs text-gray-400 truncate">
+            {{ lead.numero_wpp }}
+            {% if lead.last_message_preview %}
+             · {{ lead.last_message_preview }}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 flex-shrink-0 ml-4">
+        <span class="text-xs text-gray-400">{{ lead.tempo_relativo }}</span>
+        <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ lead.status_class }}">
+          {{ lead.status }}
+        </span>
+        {% if not lead.bot_ativo %}
+        <span class="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-700 font-medium">Manual</span>
+        {% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+  </div>
+</main>
+
+<!-- Auto refresh a cada 15s -->
+<script>setTimeout(() => location.reload(), 15000)</script>
+
+{% endblock %}
