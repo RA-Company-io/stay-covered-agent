@@ -6,9 +6,16 @@ import httpx
 import os
 from typing import Optional
 
-ZAPI_INSTANCE = os.getenv("ZAPI_INSTANCE", "3F1758F93BD46253307C667E5D6D48C0")
-ZAPI_TOKEN    = os.getenv("ZAPI_TOKEN", "C1694AB45B6FDBC5213DC780")
-ZAPI_BASE     = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}"
+ZAPI_INSTANCE    = os.getenv("ZAPI_INSTANCE", "3F1758F93BD46253307C667E5D6D48C0")
+ZAPI_TOKEN       = os.getenv("ZAPI_TOKEN", "C1694AB45B6FDBC5213DC780")
+ZAPI_CLIENT_TOKEN = os.getenv("ZAPI_CLIENT_TOKEN", "")
+ZAPI_BASE        = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}"
+
+def _headers() -> dict:
+    h = {"Content-Type": "application/json"}
+    if ZAPI_CLIENT_TOKEN:
+        h["Client-Token"] = ZAPI_CLIENT_TOKEN
+    return h
 
 
 def _numero_limpo(numero: str) -> str:
@@ -25,7 +32,7 @@ async def enviar_mensagem(numero: str, texto: str) -> bool:
     }
     async with httpx.AsyncClient(timeout=30) as client:
         try:
-            response = await client.post(url, json=payload)
+            response = await client.post(url, json=payload, headers=_headers())
             response.raise_for_status()
             return True
         except httpx.HTTPStatusError as e:
@@ -45,7 +52,7 @@ async def enviar_para_grupo(grupo_id: str, texto: str) -> bool:
     }
     async with httpx.AsyncClient(timeout=30) as client:
         try:
-            response = await client.post(url, json=payload)
+            response = await client.post(url, json=payload, headers=_headers())
             response.raise_for_status()
             return True
         except Exception as e:
@@ -58,7 +65,7 @@ async def listar_grupos() -> list:
     url = f"{ZAPI_BASE}/chats"
     async with httpx.AsyncClient(timeout=30) as client:
         try:
-            response = await client.get(url)
+            response = await client.get(url, headers=_headers())
             response.raise_for_status()
             chats = response.json()
             return [
