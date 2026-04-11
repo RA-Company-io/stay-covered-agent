@@ -28,6 +28,9 @@ async def enviar_mensagem(numero: str, texto: str) -> bool:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             return True
+        except httpx.HTTPStatusError as e:
+            print(f"Erro ao enviar mensagem para {numero}: {e} | body: {e.response.text}")
+            return False
         except Exception as e:
             print(f"Erro ao enviar mensagem para {numero}: {e}")
             return False
