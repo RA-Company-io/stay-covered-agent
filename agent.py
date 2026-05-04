@@ -68,7 +68,7 @@ PRÓXIMO CAMPO A COLETAR:
 Responda apenas com sua próxima mensagem para o cliente. Seja natural, não mencione "campo" ou listas técnicas."""
 
 
-client = anthropic.Anthropic()
+client = anthropic.AsyncAnthropic()
 
 
 def get_next_field(dados: dict) -> Optional[str]:
@@ -79,7 +79,7 @@ def get_next_field(dados: dict) -> Optional[str]:
     return None
 
 
-def extract_data_from_conversation(historico: list, dados_atuais: dict) -> dict:
+async def extract_data_from_conversation(historico: list, dados_atuais: dict) -> dict:
     """Usa Claude para extrair dados estruturados da conversa."""
 
     campos_faltando = [f for f in REQUIRED_FIELDS if not dados_atuais.get(f)]
@@ -106,7 +106,7 @@ Se um campo não foi mencionado, não inclua no JSON.
 Formato: {{"campo": "valor"}}
 Apenas o JSON, sem explicações."""
 
-    response = client.messages.create(
+    response = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}]
@@ -125,7 +125,7 @@ Apenas o JSON, sem explicações."""
     return dados_atuais
 
 
-def gerar_resposta(historico: list, dados: dict) -> str:
+async def gerar_resposta(historico: list, dados: dict) -> str:
     """Gera a próxima mensagem da Sofia baseada no histórico e dados coletados."""
 
     proximo_campo = get_next_field(dados)
@@ -142,7 +142,7 @@ def gerar_resposta(historico: list, dados: dict) -> str:
         proximo_campo=proximo_campo_texto
     )
 
-    response = client.messages.create(
+    response = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
         system=system,
@@ -152,7 +152,7 @@ def gerar_resposta(historico: list, dados: dict) -> str:
     return response.content[0].text
 
 
-def processar_mensagem(numero_telefone: str, mensagem: str, sessao: dict) -> tuple[str, dict, bool]:
+async def processar_mensagem(numero_telefone: str, mensagem: str, sessao: dict) -> tuple[str, dict, bool]:
     """
     Processa uma mensagem recebida e retorna (resposta, sessao_atualizada, coleta_completa).
 
@@ -169,7 +169,7 @@ def processar_mensagem(numero_telefone: str, mensagem: str, sessao: dict) -> tup
     })
 
     # Extrai dados da conversa
-    sessao["dados"] = extract_data_from_conversation(
+    sessao["dados"] = await extract_data_from_conversation(
         sessao["historico"],
         sessao["dados"]
     )
@@ -178,7 +178,7 @@ def processar_mensagem(numero_telefone: str, mensagem: str, sessao: dict) -> tup
     coleta_completa = get_next_field(sessao["dados"]) is None
 
     # Gera resposta da Sofia
-    resposta = gerar_resposta(sessao["historico"], sessao["dados"])
+    resposta = await gerar_resposta(sessao["historico"], sessao["dados"])
 
     # Adiciona resposta ao histórico
     sessao["historico"].append({

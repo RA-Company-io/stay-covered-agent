@@ -8,6 +8,9 @@ import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, Request, HTTPException, Form
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -223,6 +226,7 @@ async def webhook(request: Request):
     # Z-API envia token como query param
     token = request.query_params.get("token", "")
     if token != WEBHOOK_TOKEN:
+        print(f"[webhook] token inválido recebido: '{token}'")
         raise HTTPException(status_code=401)
 
     try:
@@ -231,8 +235,10 @@ async def webhook(request: Request):
         raise HTTPException(status_code=400)
 
     numero, mensagem, tipo = extrair_numero_e_mensagem(data)
+    print(f"[webhook] tipo={tipo} numero={numero} fromMe={data.get('fromMe')} phone={data.get('phone')}")
+
     if not numero or not mensagem or tipo != "texto":
-        return JSONResponse({"status": "ignored"})
+        return JSONResponse({"status": "ignored", "tipo": tipo})
 
     asyncio.create_task(_processar_mensagem(numero, mensagem))
     return JSONResponse({"status": "processing"})
@@ -267,7 +273,7 @@ async def _processar_mensagem(numero: str, mensagem: str):
         historico = await get_messages_for_agent(lead_id)
         dados_atuais = _lead_to_dados(lead)
 
-        resposta, dados_atualizados, coleta_completa = processar_mensagem(
+        resposta, dados_atualizados, coleta_completa = await processar_mensagem(
             numero, mensagem, {"historico": historico, "dados": dados_atuais}
         )
 
@@ -286,7 +292,9 @@ async def _processar_mensagem(numero: str, mensagem: str):
                 await enviar_para_grupo(GRUPO_SOCIOS_ID, notif)
 
     except Exception as e:
-        print(f"[webhook] error processing {numero}: {e}")
+        import traceback
+        print(f"[webhook] ERRO ao processar {numero}: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
         await enviar_mensagem(numero, "Desculpe, tive um probleminha técnico! 😅 Pode repetir?")
 
 
@@ -301,7 +309,19 @@ async def health():
 async def grupos(request: Request):
     if not is_authenticated(request):
         raise HTTPException(status_code=401)
-    return {"grupos": await listar_grupos()}
+    return {"grupos": await listar_grupos(), "raw": await _raw_grupos()}
+
+
+async def _raw_grupos():
+    import httpx as _httpx
+    from whatsapp import ZAPI_BASE, _headers
+    try:
+        async with _httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(f"{ZAPI_BASE}/chats", headers=_headers())
+            chats = r.json()
+            return [c for c in chats if c.get("isGroup")]
+    except Exception as e:
+        return [{"error": str(e)}]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

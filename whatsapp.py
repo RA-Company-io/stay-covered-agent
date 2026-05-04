@@ -95,12 +95,20 @@ def extrair_numero_e_mensagem(webhook_data: dict) -> tuple[Optional[str], Option
 
         numero = phone.replace("@c.us", "").replace("+", "")
 
-        # Texto simples
+        # Texto simples — Z-API pode enviar como dict {"message":"..."} ou string direta
         text_obj = webhook_data.get("text")
-        if text_obj and isinstance(text_obj, dict):
-            mensagem = text_obj.get("message", "")
+        if text_obj:
+            if isinstance(text_obj, dict):
+                mensagem = text_obj.get("message", "")
+            else:
+                mensagem = str(text_obj)
             if mensagem:
                 return numero, mensagem, "texto"
+
+        # Formato alternativo: campo "body" no nível raiz
+        body = webhook_data.get("body")
+        if body and isinstance(body, str) and body.strip():
+            return numero, body.strip(), "texto"
 
         # Imagem com legenda
         if webhook_data.get("image"):
